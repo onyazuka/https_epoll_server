@@ -1,4 +1,5 @@
 #include "HttpServer.hpp"
+#include "ProjLogger.hpp"
 
 using namespace util::web::http;
 
@@ -62,42 +63,52 @@ util::web::http::HttpResponse HttpServer::_callRoute(const std::string& route, c
 }
 
 util::web::http::HttpResponse HttpServer::GET(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("GET {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::HEAD(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("HEAD {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::POST(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("POST {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::PUT(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("PUT {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::DELETE(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("DELETE {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::CONNECT(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("CONNECT {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::OPTIONS(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("OPTIONS {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::TRACE(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("TRACE {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::PATCH(const std::string& route, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("PATCH {}", route));
 	return _callRoute(route, request);
 }
 
 util::web::http::HttpResponse HttpServer::defaultReponse(size_t statusCode, const util::web::http::HttpRequest& request) const {
+	Log.info(std::format("Sending default response {}", statusCode));
 	HttpHeaders headers;
 	util::web::http::HttpResponse response{
 		statusCode,
