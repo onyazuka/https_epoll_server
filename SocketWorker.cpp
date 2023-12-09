@@ -120,7 +120,7 @@ void SocketDataHandler::onInputData(int epollFd, std::shared_ptr<ISocket> client
 		bodyStartPos = offset + pos + 4;
 	}
 	if (request.parsed() || request.parse(std::string_view((char*)bufData.data(), (char*)bufData.data() + bodyStartPos))) {
-		if (std::string sContLen = request.headers().find("CONTENT-LENGTH"); !sContLen.empty()) {
+		if (std::string sContLen = request.headers().find("Content-Length"); !sContLen.empty()) {
 			size_t contentLength = std::stoull(sContLen);
 			size_t dataRestLen = bufData.size() - bodyStartPos;
 			if (dataRestLen < contentLength) {
