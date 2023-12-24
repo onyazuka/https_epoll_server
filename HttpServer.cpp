@@ -13,6 +13,9 @@ HttpServer& HttpServer::get() {
 }
 
 void HttpServer::registerRoute(const std::string& url, util::web::http::Method method, RouteHandlerT handler) {
+	if (url.empty()) {
+		throw std::runtime_error("route can't be empty");
+	}
 	if (auto iter = _routes.find(url); iter != _routes.end()) {
 		if (auto iter2 = iter->second.find(method); iter2 != iter->second.end()) {
 			throw std::logic_error("route already exists");
@@ -54,9 +57,24 @@ util::web::http::HttpResponse HttpServer::callRoute(const std::string& route, co
 }
 
 util::web::http::HttpResponse HttpServer::_callRoute(const std::string& route, const util::web::http::HttpRequest& request) const {
-	if (auto iter = _routes.find(route); iter != _routes.end()) {
-		if (auto iter2 = iter->second.find(request.method); iter2 != iter->second.end()) {
-			return iter2->second(request);
+	for (const auto& _route : _routes) {
+		if (_route.first.back() == '*') {
+			// wildcard request - checking prefix to match
+			std::string_view _routeSv(_route.first);
+			_routeSv = _routeSv.substr(0, _routeSv.size() - 1);
+			if ((route.find(_routeSv) == 0) && (_routeSv.size() <= route.size())) {
+				if (auto iter2 = _route.second.find(request.method); iter2 != _route.second.end()) {
+					return iter2->second(request);
+				}
+			}
+		}
+		else {
+			// exact request - checking for equality
+			if (route == _route.first) {
+				if (auto iter2 = _route.second.find(request.method); iter2 != _route.second.end()) {
+					return iter2->second(request);
+				}
+			}
 		}
 	}
 	return defaultReponse(404, request);
