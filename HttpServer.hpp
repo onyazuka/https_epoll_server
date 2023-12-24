@@ -14,6 +14,8 @@ public:
 	util::web::http::HttpResponse callRoute(const std::string& route, const util::web::http::HttpRequest& request) const;
 	inline auto& routes() { return _routes; }
 	static HttpServer& get();
+	void setRoot(const std::string& root);
+	void setRoot(std::string&& root);
 	util::web::http::HttpResponse GET(const std::string& route, const util::web::http::HttpRequest& request) const;
 	util::web::http::HttpResponse HEAD(const std::string& route, const util::web::http::HttpRequest& request) const;
 	util::web::http::HttpResponse POST(const std::string& route, const util::web::http::HttpRequest& request) const;
@@ -23,8 +25,10 @@ public:
 	util::web::http::HttpResponse OPTIONS(const std::string& route, const util::web::http::HttpRequest& request) const;
 	util::web::http::HttpResponse TRACE(const std::string& route, const util::web::http::HttpRequest& request) const;
 	util::web::http::HttpResponse PATCH(const std::string& route, const util::web::http::HttpRequest& request) const;
+	util::web::http::HttpResponse getEntireFile(const std::string& route, const util::web::http::HttpRequest& request) const;
 private:
 	util::web::http::HttpResponse _callRoute(const std::string& route, const util::web::http::HttpRequest& request) const;
 	HttpServer();
 	std::unordered_map<std::string, std::unordered_map<util::web::http::Method, RouteHandlerT>> _routes;
+	std::string root;
 };

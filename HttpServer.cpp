@@ -1,15 +1,36 @@
 #include "HttpServer.hpp"
 #include "ProjLogger.hpp"
+#include <filesystem>
+#include <fstream>
+#include "Utils_Fs.hpp"
 
 using namespace util::web::http;
 
-HttpServer::HttpServer() {
+static constexpr size_t MaxFileSize = 1 * 1024 * 1024;
 
+static std::unordered_map<std::string, std::string> FileExt2ContentTypeMap{
+	{".js", "application/javascript"},
+	{".css", "text/css"},
+	{".html", "text/html; charset=utf-8"}
+};
+
+HttpServer::HttpServer() {
+	registerRoute("/", Method::GET, [this](const util::web::http::HttpRequest& request) {
+		return getEntireFile("/index.html", request);
+		});
 }
 
 HttpServer& HttpServer::get() {
 	static HttpServer srv{};
 	return srv;
+}
+
+void HttpServer::setRoot(const std::string& _root) {
+	root = _root;
+}
+
+void HttpServer::setRoot(std::string&& _root) {
+	root = std::move(_root);
 }
 
 void HttpServer::registerRoute(const std::string& url, util::web::http::Method method, RouteHandlerT handler) {
@@ -53,6 +74,8 @@ util::web::http::HttpResponse HttpServer::callRoute(const std::string& route, co
 		return TRACE(route, request);
 	case Method::PATCH:
 		return PATCH(route, request);
+	default:
+		assert(false);
 	}
 }
 
@@ -123,6 +146,35 @@ util::web::http::HttpResponse HttpServer::TRACE(const std::string& route, const 
 util::web::http::HttpResponse HttpServer::PATCH(const std::string& route, const util::web::http::HttpRequest& request) const {
 	Log.info(std::format("PATCH {}", route));
 	return _callRoute(route, request);
+}
+
+util::web::http::HttpResponse HttpServer::getEntireFile(const std::string& route, const util::web::http::HttpRequest& request) const {
+	std::string absRoute = root + route;
+	auto pathRoute = std::filesystem::weakly_canonical(absRoute);
+
+	// checking route to be subpath of root to prevent "/../..." access
+	if (
+		!std::filesystem::exists(absRoute) || 
+		!util::fs::isSubpath(std::filesystem::canonical(absRoute), root) || 
+		!FileExt2ContentTypeMap.contains(std::filesystem::path(absRoute).extension())) {
+		return defaultReponse(404, request);
+	}
+
+	std::ifstream ifs(absRoute);
+	ifs.seekg(0, ifs.end);
+	size_t fsize = ifs.tellg();
+	if (fsize > MaxFileSize) {
+		return defaultReponse(413, request);
+	}
+	ifs.seekg(0, ifs.beg);
+
+	std::string responseBody;
+	responseBody.resize(fsize);
+	ifs.read(responseBody.data(), fsize);
+
+	HttpResponse response(200, request.headers, std::move(responseBody));
+	response.headers.add("Content-Type", FileExt2ContentTypeMap.find(pathRoute.extension())->second);
+	return response;
 }
 
 util::web::http::HttpResponse HttpServer::defaultReponse(size_t statusCode, const util::web::http::HttpRequest& request) const {
