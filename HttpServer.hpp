@@ -29,6 +29,6 @@ public:
 private:
 	util::web::http::HttpResponse _callRoute(const std::string& route, const util::web::http::HttpRequest& request) const;
 	HttpServer();
-	std::unordered_map<std::string, std::unordered_map<util::web::http::Method, RouteHandlerT>> _routes;
+	std::unordered_map<util::web::http::Method, std::unordered_map<std::string, RouteHandlerT>> _routes;
 	std::string root;
 };

@@ -37,19 +37,19 @@ void HttpServer::registerRoute(const std::string& url, util::web::http::Method m
 	if (url.empty()) {
 		throw std::runtime_error("route can't be empty");
 	}
-	if (auto iter = _routes.find(url); iter != _routes.end()) {
-		if (auto iter2 = iter->second.find(method); iter2 != iter->second.end()) {
+	if (auto iter = _routes.find(method); iter != _routes.end()) {
+		if (auto iter2 = iter->second.find(url); iter2 != iter->second.end()) {
 			throw std::logic_error("route already exists");
 		}
 	}
-	_routes[url][method] = handler;
+	_routes[method][url] = handler;
 }
 
 void HttpServer::unregisterRoute(const std::string& url, util::web::http::Method method) {
-	if (auto iter = _routes.find(url); iter != _routes.end()) {
-		iter->second.erase(method);
+	if (auto iter = _routes.find(method); iter != _routes.end()) {
+		iter->second.erase(url);
 		if (iter->second.empty()) {
-			_routes.erase(url);
+			_routes.erase(method);
 		}
 	}
 }
@@ -80,22 +80,20 @@ util::web::http::HttpResponse HttpServer::callRoute(const std::string& route, co
 }
 
 util::web::http::HttpResponse HttpServer::_callRoute(const std::string& route, const util::web::http::HttpRequest& request) const {
-	for (const auto& _route : _routes) {
-		if (_route.first.back() == '*') {
-			// wildcard request - checking prefix to match
-			std::string_view _routeSv(_route.first);
-			_routeSv = _routeSv.substr(0, _routeSv.size() - 1);
-			if ((route.find(_routeSv) == 0) && (_routeSv.size() <= route.size())) {
-				if (auto iter2 = _route.second.find(request.method); iter2 != _route.second.end()) {
-					return iter2->second(request);
+	if (auto iMethod = _routes.find(request.method); iMethod != _routes.end()) {
+		for (const auto& _route : iMethod->second) {
+			if (_route.first.back() == '*') {
+				// wildcard request - checking prefix to match
+				std::string_view _routeSv(_route.first);
+				_routeSv = _routeSv.substr(0, _routeSv.size() - 1);
+				if ((route.find(_routeSv) == 0) && (_routeSv.size() <= route.size())) {
+					return _route.second(request);
 				}
 			}
-		}
-		else {
-			// exact request - checking for equality
-			if (route == _route.first) {
-				if (auto iter2 = _route.second.find(request.method); iter2 != _route.second.end()) {
-					return iter2->second(request);
+			else {
+				// exact request - checking for equality
+				if (route == _route.first) {
+					return _route.second(request);
 				}
 			}
 		}
