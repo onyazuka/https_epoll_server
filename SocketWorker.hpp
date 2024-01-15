@@ -26,7 +26,9 @@ public:
 	void setMapper(SocketThreadMapper* _mapper);
 	void onInputData(int epollFd, std::shared_ptr<inet::ISocket> sock);
 	void onError(int epollFd, std::shared_ptr<inet::ISocket> sock);
-	void onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock);
+	bool onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock, const util::web::http::HttpResponse& response);
+	bool onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock, std::string&& msg);
+	bool onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock);
 	void run();
 private:
 
@@ -43,7 +45,7 @@ private:
 	};
 
 	bool checkInputBufData(std::string_view sv);
-
+	bool __onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock, Connection& connection);
 	void onCloseClient(int epollFd, std::shared_ptr<inet::ISocket> sock);
 	void onHttpRequest(int epollFd, std::shared_ptr<inet::ISocket> clientSock, const util::web::http::HttpRequest& request);
 	bool checkFd(std::shared_ptr<inet::ISocket> sock);
@@ -55,6 +57,7 @@ private:
 	//int epollFd;
 	std::mutex mtx;
 	SocketThreadMapper* mapper = nullptr;
+	std::function<std::function<void(size_t, std::variant<util::web::http::HttpResponse, std::string>)>(int, std::shared_ptr<inet::ISocket>)> onResponseFromApiCb;
 
 };
 

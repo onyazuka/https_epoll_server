@@ -3,7 +3,9 @@
 #include <sys/epoll.h>
 #include <string.h>
 #include <syncstream>
+#include "EventBroker.hpp"
 #include "Http.hpp"
+#include <iostream>
 
 using namespace inet;
 using namespace util::web::http;
@@ -11,7 +13,29 @@ using namespace util::web::http;
 SocketDataHandler::SocketDataHandler(QueueT&& tasksQueue, ThreadPoolT* ptp, size_t _threadIdx)
 	: tasksQueue{ std::move(tasksQueue) }, threadPool{ptp}, threadIdx{_threadIdx}
 {
-	;
+	onResponseFromApiCb = [this](int epollFd, std::shared_ptr<inet::ISocket> clientSock) {
+		return [this, epollFd, clientSock](size_t producerId, std::variant<HttpResponse, std::string> response) {
+			auto epfd = epollFd;
+			auto clsock = clientSock;
+			threadPool->pushTask(threadIdx, std::function([this, producerId](int epollFd, std::shared_ptr<inet::ISocket> clientSock, std::variant<util::web::http::HttpResponse, std::string> response) {
+				std::visit([this, epollFd, clientSock, producerId](auto&& msg) {
+					if constexpr (std::is_same_v<std::decay_t<decltype(msg)>, std::string>) {
+						if (!onHttpResponse(epollFd, clientSock, std::move(msg))) {
+							EventBroker::get().unregister(producerId);
+						}
+						return 0;
+					}
+					else if constexpr (std::is_same_v<std::decay_t<decltype(msg)>, HttpResponse>) {
+						if (!onHttpResponse(epollFd, clientSock, msg)) {
+							EventBroker::get().unregister(producerId);
+						}
+						return 0;
+					}
+					}, response);
+				}),
+				std::move(epfd), std::move(clsock), std::move(response));
+			};
+		};
 }
 
 SocketDataHandler::SocketDataHandler(SocketDataHandler&& other) noexcept
@@ -147,7 +171,6 @@ void SocketDataHandler::onInputData(int epollFd, std::shared_ptr<ISocket> client
 }
 
 void SocketDataHandler::onError(int epollFd, std::shared_ptr<ISocket> clientSock) {
-	Log.error(std::format("Closing connection from server with client {}", clientSock->fd()));
 	onCloseClient(epollFd, clientSock);
 }
 
@@ -173,6 +196,7 @@ bool SocketDataHandler::checkInputBufData(std::string_view sv) {
 void SocketDataHandler::onCloseClient(int epollFd, std::shared_ptr<ISocket> clientSock) {
 	int fd = clientSock->fd();
 	if (!checkFd(clientSock)) return;
+	Log.error(std::format("Closing connection from server with client {}", clientSock->fd()));
 	epoll_ctl(epollFd, EPOLL_CTL_DEL, fd, NULL);
 	close(fd);
 	mapper->removeFd(clientSock->fd());
@@ -184,24 +208,60 @@ void SocketDataHandler::onHttpRequest(int epollFd, std::shared_ptr<ISocket> clie
 	// no need to check fd, because it is sequential call from onInputData
 	auto& connection = sockConnection[fd];
 	
-	auto response = HttpServer::get().callRoute(request.url, request);
+	/*auto cb = [this, epollFd, clientSock](size_t producerId, HttpResponse msg) {
+		outputMessages.push({ producerId, epollFd, clientSock, msg });
+
+		};*/
+	auto cb = onResponseFromApiCb(epollFd, clientSock);
+	auto response = HttpServer::get().callRoute(request.url, request, cb);
 
 	connection.obuf = OutputSocketBuffer(response.encode());
-	onHttpResponse(epollFd, clientSock);
+	__onHttpResponse(epollFd, clientSock, connection);
 }
 
-void SocketDataHandler::onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock) {
+bool SocketDataHandler::onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock, const util::web::http::HttpResponse& response) {
 	int fd = clientSock->fd();
-	if (!checkFd(clientSock)) return;
+	if (!checkFd(clientSock)) return false;
 	auto& connection = sockConnection[fd];
+	if (!connection.obuf.empty()) {
+		Log.warning(std::format("Receiveng response from {}, but another response is in process", fd));
+		onError(epollFd, clientSock);
+		return false;
+	}
+	connection.obuf = OutputSocketBuffer(response.encode());
+	return __onHttpResponse(epollFd, clientSock, connection);
+}
+
+// can be used for raw-message, for example, for appending to existing http response
+bool SocketDataHandler::onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock, std::string&& response) {
+	int fd = clientSock->fd();
+	if (!checkFd(clientSock)) return false;
+	auto& connection = sockConnection[fd];
+	if (!connection.obuf.empty()) {
+		Log.warning(std::format("Receiveng response from {}, but another response is in process", fd));
+		onError(epollFd, clientSock);
+		return false;
+	}
+	connection.obuf = OutputSocketBuffer(std::move(response));
+	return __onHttpResponse(epollFd, clientSock, connection);
+}
+
+bool SocketDataHandler::onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock) {
+	int fd = clientSock->fd();
+	if (!checkFd(clientSock)) return false;
+	auto& connection = sockConnection[fd];
+	return __onHttpResponse(epollFd, clientSock, connection);
+}
+
+bool SocketDataHandler::__onHttpResponse(int epollFd, std::shared_ptr<inet::ISocket> clientSock, Connection& connection) {
 	auto& obuf = connection.obuf;
-	if (obuf.empty()) return;
+	if (obuf.empty()) return true;
 	ssize_t nbytes = clientSock->write(obuf);
 	if ((nbytes == 0) || ((nbytes < 0) && (nbytes != -EAGAIN))) {
 		// error - closing connection
 		Log.error(clientSock->strerr());
 		onError(epollFd, clientSock);
-		return;
+		return false;
 	}
 	else if ((nbytes == EAGAIN) || !(obuf.finished())) {
 		// recoverable error - will try to send again later
@@ -217,6 +277,7 @@ void SocketDataHandler::onHttpResponse(int epollFd, std::shared_ptr<inet::ISocke
 	if (nbytes > 0) {
 		Log.debug(std::format("Write {} bytes to {}", nbytes, clientSock->fd()));
 	}
+	return true;
 }
 
 bool SocketDataHandler::checkFd(std::shared_ptr<ISocket> sock) {

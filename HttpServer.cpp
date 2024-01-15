@@ -15,8 +15,8 @@ static std::unordered_map<std::string, std::string> FileExt2ContentTypeMap{
 };
 
 HttpServer::HttpServer() {
-	registerRoute("/", Method::GET, [this](const util::web::http::HttpRequest& request) {
-		return getEntireFile("/index.html", request);
+	registerRoute("/", Method::GET, [this](const util::web::http::HttpRequest& request, HttpServer::CallbackMsgFn cbMsgFn) {
+		return getEntireFile("/index.html", request, cbMsgFn);
 		});
 }
 
@@ -54,32 +54,32 @@ void HttpServer::unregisterRoute(const std::string& url, util::web::http::Method
 	}
 }
 
-util::web::http::HttpResponse HttpServer::callRoute(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::callRoute(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	switch (request.method) {
 	case Method::GET:
-		return GET(route, request);
+		return GET(route, request, cbMsgFn);
 	case Method::HEAD:
-		return HEAD(route, request);
+		return HEAD(route, request, cbMsgFn);
 	case Method::POST:
-		return POST(route, request);
+		return POST(route, request, cbMsgFn);
 	case Method::PUT:
-		return PUT(route, request);
+		return PUT(route, request, cbMsgFn);
 	case Method::DELETE:
-		return DELETE(route, request);
+		return DELETE(route, request, cbMsgFn);
 	case Method::CONNECT:
-		return CONNECT(route, request);
+		return CONNECT(route, request, cbMsgFn);
 	case Method::OPTIONS:
-		return OPTIONS(route, request);
+		return OPTIONS(route, request, cbMsgFn);
 	case Method::TRACE:
-		return TRACE(route, request);
+		return TRACE(route, request, cbMsgFn);
 	case Method::PATCH:
-		return PATCH(route, request);
+		return PATCH(route, request, cbMsgFn);
 	default:
 		assert(false);
 	}
 }
 
-util::web::http::HttpResponse HttpServer::_callRoute(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::_callRoute(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	if (auto iMethod = _routes.find(request.method); iMethod != _routes.end()) {
 		for (const auto& _route : iMethod->second) {
 			if (_route.first.back() == '*') {
@@ -87,13 +87,13 @@ util::web::http::HttpResponse HttpServer::_callRoute(const std::string& route, c
 				std::string_view _routeSv(_route.first);
 				_routeSv = _routeSv.substr(0, _routeSv.size() - 1);
 				if ((route.find(_routeSv) == 0) && (_routeSv.size() <= route.size())) {
-					return _route.second(request);
+					return _route.second(request, cbMsgFn);
 				}
 			}
 			else {
 				// exact request - checking for equality
 				if (route == _route.first) {
-					return _route.second(request);
+					return _route.second(request, cbMsgFn);
 				}
 			}
 		}
@@ -101,52 +101,52 @@ util::web::http::HttpResponse HttpServer::_callRoute(const std::string& route, c
 	return defaultReponse(404, request);
 }
 
-util::web::http::HttpResponse HttpServer::GET(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::GET(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("GET {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::HEAD(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::HEAD(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("HEAD {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::POST(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::POST(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("POST {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::PUT(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::PUT(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("PUT {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::DELETE(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::DELETE(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("DELETE {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::CONNECT(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::CONNECT(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("CONNECT {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::OPTIONS(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::OPTIONS(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("OPTIONS {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::TRACE(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::TRACE(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("TRACE {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::PATCH(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::PATCH(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("PATCH {}", route));
-	return _callRoute(route, request);
+	return _callRoute(route, request, cbMsgFn);
 }
 
-util::web::http::HttpResponse HttpServer::getEntireFile(const std::string& route, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::getEntireFile(const std::string& route, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	std::string absRoute = root + route;
 	auto pathRoute = std::filesystem::weakly_canonical(absRoute);
 
@@ -175,7 +175,7 @@ util::web::http::HttpResponse HttpServer::getEntireFile(const std::string& route
 	return response;
 }
 
-util::web::http::HttpResponse HttpServer::defaultReponse(size_t statusCode, const util::web::http::HttpRequest& request) const {
+util::web::http::HttpResponse HttpServer::defaultReponse(size_t statusCode, const util::web::http::HttpRequest& request, CallbackMsgFn cbMsgFn) const {
 	Log.info(std::format("Sending default response {}", statusCode));
 	HttpHeaders headers;
 	util::web::http::HttpResponse response{

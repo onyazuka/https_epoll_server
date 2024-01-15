@@ -14,12 +14,14 @@
     <ProjectCapability Include="SourceItemsFromImports" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)EventBroker.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)HttpServer.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)ProjLogger.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)SocketWorker.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)TcpServer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)EventBroker.hpp" />
     <ClInclude Include="$(MSBuildThisFileDirectory)HttpServer.hpp" />
     <ClInclude Include="$(MSBuildThisFileDirectory)ProjLogger.hpp" />
     <ClInclude Include="$(MSBuildThisFileDirectory)SocketWorker.hpp" />
